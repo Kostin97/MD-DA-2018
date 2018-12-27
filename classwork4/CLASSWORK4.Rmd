@@ -1,0 +1,112 @@
+---
+title: "classwork4"
+author: "Ярослав Костин"
+date: '26 декабря 2018 г '
+output: html_document
+---
+
+```{r}
+gmp.df<-data.frame(read.table("https://raw.githubusercontent.com/SergeyMirvoda/MD-DA-2018/master/data/gmp.dat"))
+gmp.df$pop <- gmp.df$gmp / gmp.df$pcgmp
+
+estimate.scaling.exponent <- function(a, y0=6611, response=gmp.df$pcgmp,
+                                      predictor = gmp.df$pop, maximum.iterations=100, deriv.step = 1/100,
+                                      step.scale = 1e-12, stopping.deriv = 1/100) {
+  mse <- function(a) { mean((response - y0*predictor^a)^2) }
+  for (iteration in 1:maximum.iterations) {
+    deriv <- (mse(a+deriv.step) - mse(a))/deriv.step
+    a <- a - step.scale*deriv
+    if (abs(deriv) <= stopping.deriv) { break() }
+  }
+  fit <- list(a=a,iterations=iteration,
+              converged=(iteration < maximum.iterations))
+  return(fit)
+}
+
+#Пример вызова с начальным занчением a
+a<-estimate.scaling.exponent(0.15)
+a #0.1211533
+
+#С помошью полученного коэффициента постройте кривую (функция curve) зависимости
+plot(pcgmp~pop, data=gmp.df, xlab="Население", log="xy",
+     ylab="Доход на душу населения ($/человеко-год)", main="Метрополии США, 2006")
+curve(6611*x^a, add = TRUE, col = "red")
+
+#Удалите точку из набора исходных данных случайным образом, как изменилось статистическая оценка коэффициента a?
+gmp.df<-gmp.df[1:365,]
+a<-estimate.scaling.exponent(0.15)
+a #0.1212088
+
+#Запустите оценку несколько раз с разных стартовых точек. Как изменилось значение a?
+a<-estimate.scaling.exponent(0.2)
+a #0.1212088
+a<-estimate.scaling.exponent(0.1)
+a #0.1212088
+a<-estimate.scaling.exponent(0.05)
+a #0.1212088
+a<-estimate.scaling.exponent(0.3)
+a #-2.854871
+
+```
+```{r}
+#Задание
+#Добавить проверку на выборы и избавиться от них
+library(dplyr)
+plot(data$weight.loss, data$diet.type) 
+data <- data %>% filter(weight.loss >= 0 & weight.loss <= 8) 
+plot(data$weight.loss, data$diet.type) 
+```
+```{r}
+#повторно проверсти все тесты и сравнить результаты с выбросами и без
+boxplot(weight.loss~diet.type,data=data,col="light gray",
+        ylab = "Weight loss (kg)", xlab = "Diet type")
+abline(h=0,col="green")
+
+#проверим сбалансированные ли данные
+table(data$diet.type)
+
+#График групповых средних
+library(gplots) #библиотека устанавлевается с помощью install.packages
+plotmeans(weight.loss ~ diet.type, data=data)
+aggregate(data$weight.loss, by = list(data$diet.type), FUN=sd)
+
+
+#Для подгонки ANOVA модели используем функцию aov, частный случай линейной модели lm
+#тест на межгрупповые различия
+fit <- aov(weight.loss ~ diet.type, data=data)
+summary(fit)
+
+#попарные различия между средними значениями для всех групп
+TukeyHSD(fit)
+
+#Tukey honest significant differences test)
+library(multcomp)
+par(mar=c(5,4,6,2))
+tuk <- glht(fit, linfct=mcp(diet.type="Tukey"))
+plot(cld(tuk, level=.05),col="lightgrey")
+#После очистки данных диета B стала лучше диеты A
+```
+```{r}
+#Открыть документ https://www.sheffield.ac.uk/polopoly_fs/1.547015!/file/Diet_data_description.docx
+#и попытаться выполнить задания из него
+data$gender <- factor(c("Female", "Male")[data$gender+1])
+plotmeans(weight.loss ~ gender, data=data)
+aggregate(data$weight.loss, by = list(data$gender), FUN=sd)
+
+
+#Для подгонки ANOVA модели используем функцию aov, частный случай линейной модели lm
+#тест на межгрупповые различия
+fit <- aov(weight.loss ~ gender, data=data)
+summary(fit)
+
+#попарные различия между средними значениями для всех групп
+TukeyHSD(fit)
+
+#Tukey honest significant differences test)
+library(multcomp)
+par(mar=c(5,4,6,2))
+tuk <- glht(fit, linfct=mcp(gender="Tukey"))
+plot(cld(tuk, level=.05),col="lightgrey")
+#Пол слабо влияет на потерю веса
+```
+
